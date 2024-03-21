@@ -62,7 +62,7 @@ namespace TrainReservation.Controllers
             if (kalanYolcular > 0)
             {
                 cevap.RezervasyonYapilabilir = false;
-                cevap.YerlesimAyrinti.Clear(); // Yerleşim detaylarını temizle
+                cevap.YerlesimAyrinti.Clear(); 
                 return Ok(JsonConvert.SerializeObject(cevap));
             }
 
