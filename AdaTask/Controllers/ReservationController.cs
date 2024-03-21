@@ -8,66 +8,70 @@ namespace TrainReservation.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class ReservationController : ControllerBase
+    public class RezervasyonController : ControllerBase
     {
         [HttpPost]
-        public IActionResult Post([FromBody] ReservationRequest request)
+        public IActionResult Post([FromBody] RezervasyonIstegi istek)
         {
-            var tren = request.Tren;
-            var totalPassengers = request.RezervasyonYapilacakKisiSayisi;
-            var canAccommodate = request.KisilerFarkliVagonlaraYerlestirilebilir;
+            var tren = istek.Tren;
+            var toplamYolcular = istek.RezervasyonYapilacakKisiSayisi;
+            var farkliVagonlaraYerlestirilebilir = istek.KisilerFarkliVagonlaraYerlestirilebilir;
 
-            var response = new ReservationResponse();
-            var remainingPassengers = totalPassengers;
+            var cevap = new RezervasyonCevabi();
+            var kalanYolcular = toplamYolcular;
 
-            var availableSeats = new List<(string VagonAdi, int KoltukSayisi)>();
+            var uygunKoltuklar = new List<(string VagonAdi, int KoltukSayisi)>();
 
             foreach (var vagon in tren.Vagonlar)
             {
-                double occupancyRate = (double)vagon.DoluKoltukAdet / vagon.Kapasite;
+                double dolulukOrani = (double)vagon.DoluKoltukAdet / vagon.Kapasite;
 
-                if (occupancyRate <= 0.7)
+                if (dolulukOrani <= 0.7)
                 {
-                    int emptySeats = (int)Math.Ceiling(vagon.Kapasite * 0.7) - vagon.DoluKoltukAdet;
+                    int bosKoltuklar = (int)Math.Ceiling(vagon.Kapasite * 0.7) - vagon.DoluKoltukAdet;
 
-                    if (emptySeats > 0)
+                    if (bosKoltuklar > 0)
                     {
-                        availableSeats.Add((vagon.Ad, emptySeats));
+                        uygunKoltuklar.Add((vagon.Ad, bosKoltuklar));
                     }
                 }
             }
 
-            if (!canAccommodate)
+            if (!farkliVagonlaraYerlestirilebilir || !uygunKoltuklar.Any())
             {
-                response.RezervasyonYapilabilir = false;
-                return Ok(JsonConvert.SerializeObject(response));
+                cevap.RezervasyonYapilabilir = false;
+                return Ok(JsonConvert.SerializeObject(cevap));
             }
 
-            if (availableSeats.Any())
+            foreach (var koltuk in uygunKoltuklar)
             {
-                foreach (var seat in availableSeats)
+                var vagonIcinYolcuSayisi = Math.Min(kalanYolcular, koltuk.KoltukSayisi);
+                cevap.YerlesimAyrinti.Add(new VagonRezervasyonu
                 {
-                    var passengersInVagon = Math.Min(remainingPassengers, seat.KoltukSayisi);
-                    response.YerlesimAyrinti.Add(new VagonReservation
-                    {
-                        VagonAdi = seat.VagonAdi,
-                        KisiSayisi = passengersInVagon
-                    });
+                    VagonAdi = koltuk.VagonAdi,
+                    KisiSayisi = vagonIcinYolcuSayisi
+                });
 
-                    remainingPassengers -= passengersInVagon;
+                kalanYolcular -= vagonIcinYolcuSayisi;
 
-                    if (remainingPassengers == 0)
-                        break;
-                }
+                if (kalanYolcular == 0)
+                    break;
             }
 
-            response.RezervasyonYapilabilir = remainingPassengers == 0;
+            if (kalanYolcular > 0)
+            {
+                cevap.RezervasyonYapilabilir = false;
+                cevap.YerlesimAyrinti.Clear(); // Yerleşim detaylarını temizle
+                return Ok(JsonConvert.SerializeObject(cevap));
+            }
 
-            return Ok(JsonConvert.SerializeObject(response));
+            cevap.RezervasyonYapilabilir = true;
+
+            return Ok(JsonConvert.SerializeObject(cevap));
         }
     }
 
-    public class ReservationRequest
+    public class RezervasyonIstegi
     {
         public Tren Tren { get; set; }
         public int RezervasyonYapilacakKisiSayisi { get; set; }
@@ -86,19 +90,19 @@ namespace TrainReservation.Controllers
         public int Kapasite { get; set; }
         public int DoluKoltukAdet { get; set; }
     }
-    public class VagonReservation
+    public class VagonRezervasyonu
     {
         public string VagonAdi { get; set; }
         public int KisiSayisi { get; set; }
     }
-    public class ReservationResponse
+    public class RezervasyonCevabi
     {
         public bool RezervasyonYapilabilir { get; set; }
-        public List<VagonReservation> YerlesimAyrinti { get; set; }
+        public List<VagonRezervasyonu> YerlesimAyrinti { get; set; }
 
-        public ReservationResponse()
+        public RezervasyonCevabi()
         {
-            YerlesimAyrinti = new List<VagonReservation>();
+            YerlesimAyrinti = new List<VagonRezervasyonu>();
         }
     }
 }
