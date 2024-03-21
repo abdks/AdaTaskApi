@@ -22,19 +22,14 @@ namespace TrainReservation.Controllers
 
             var availableSeats = new List<(string VagonAdi, int KoltukSayisi)>();
 
-            // Vagonlarda boş koltukları bul
             foreach (var vagon in tren.Vagonlar)
             {
-                // Doluluk oranını hesapla
                 double occupancyRate = (double)vagon.DoluKoltukAdet / vagon.Kapasite;
 
-                // Doluluk oranının %70'den az veya eşit olduğunu kontrol et
                 if (occupancyRate <= 0.7)
                 {
-                    // Mevcut doluluk oranına göre boş koltuk sayısını hesapla
                     int emptySeats = (int)Math.Ceiling(vagon.Kapasite * 0.7) - vagon.DoluKoltukAdet;
 
-                    // Boş koltuk varsa, bu vagonu availableSeats listesine ekle
                     if (emptySeats > 0)
                     {
                         availableSeats.Add((vagon.Ad, emptySeats));
@@ -42,47 +37,27 @@ namespace TrainReservation.Controllers
                 }
             }
 
-            if (canAccommodate && availableSeats.Any())
+            if (!canAccommodate)
             {
-                // Uygun vagonlara yolcuları yerleştir
+                response.RezervasyonYapilabilir = false;
+                return Ok(JsonConvert.SerializeObject(response));
+            }
+
+            if (availableSeats.Any())
+            {
                 foreach (var seat in availableSeats)
                 {
                     var passengersInVagon = Math.Min(remainingPassengers, seat.KoltukSayisi);
-response.YerlesimAyrinti.Add(new VagonReservation
-{
-  VagonAdi = seat.VagonAdi,
-  KisiSayisi = passengersInVagon
-});
+                    response.YerlesimAyrinti.Add(new VagonReservation
+                    {
+                        VagonAdi = seat.VagonAdi,
+                        KisiSayisi = passengersInVagon
+                    });
 
                     remainingPassengers -= passengersInVagon;
 
                     if (remainingPassengers == 0)
                         break;
-                }
-            }
-            else
-            {
-                // Farklı vagonlara yerleştirilemiyorsa veya uygun vagon yoksa, varolan vagonlara yerleştir
-                foreach (var vagon in tren.Vagonlar)
-                {
-                    if (remainingPassengers <= 0)
-                        break;
-
-                    var emptySeats = (int)Math.Ceiling(vagon.Kapasite * 0.7) - vagon.DoluKoltukAdet;
-
-                    if (emptySeats > 0)
-                    {
-                        var passengersInVagon = Math.Min(remainingPassengers, emptySeats);
-
-                        response.YerlesimAyrinti.Add(new VagonReservation
-                        {
-                            VagonAdi = vagon.Ad,
-                            KisiSayisi = passengersInVagon
-                        });
-
-                        vagon.DoluKoltukAdet += passengersInVagon;
-                        remainingPassengers -= passengersInVagon;
-                    }
                 }
             }
 
@@ -119,7 +94,7 @@ response.YerlesimAyrinti.Add(new VagonReservation
     public class ReservationResponse
     {
         public bool RezervasyonYapilabilir { get; set; }
-        public List<VagonReservation> YerlesimAyrinti { get; set; } // "VagonReservation" olarak değiştirildi
+        public List<VagonReservation> YerlesimAyrinti { get; set; }
 
         public ReservationResponse()
         {
